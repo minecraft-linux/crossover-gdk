@@ -1914,6 +1914,50 @@ void get_nt_name( struct fd *fd, struct unicode_str *name )
     name->len = fd->nt_namelen;
 }
 
+/***********************************************************************
+ *           open_mapped_exe_file
+ */
+static void open_mapped_exe_file( const char* unix_name, int* unix_fd )
+{
+    size_t unix_name_len = strlen( unix_name );
+    if (unix_name_len < 4 || strcasecmp( unix_name + unix_name_len - 4, ".exe" )) return;
+    const char *value = getenv( "WINE_EXE_FILE_MAP" );
+    if (!value || !*value) return;
+    const char *entry, *sep, *end;
+
+    for (entry = value; *entry; entry = *end ? end + 1 : end)
+    {
+        size_t len;
+        int fd = 0;
+        const char *p;
+
+        end = strchr( entry, '|' );
+        if (!end) end = entry + strlen( entry );
+        if (end == entry) continue;
+
+        sep = strchr( entry, ':' );
+        if (!sep || sep >= end) continue;
+
+        for (p = entry; p < sep; p++)
+        {
+            if (*p < '0' || *p > '9')
+            {
+                fd = -1;
+                break;
+            }
+            fd = fd * 10 + (*p - '0');
+        }
+        if (fd < 0 || sep == entry || sep + 1 == end) continue;
+        len = end - sep - 1;
+        if (len != unix_name_len || strncmp( sep + 1, unix_name, len )) continue;
+
+        // Replace the file descriptor
+        close ( *unix_fd );
+        *unix_fd = dup( fd );
+        return;
+    }
+}
+
 /* open() wrapper that returns a struct fd with no fd user set */
 struct fd *open_fd( struct fd *root, const char *name, struct unicode_str nt_name,
                     int flags, mode_t *mode, unsigned int access,
@@ -2018,6 +2062,8 @@ struct fd *open_fd( struct fd *root, const char *name, struct unicode_str nt_nam
             fd->unix_name = realpath( path, NULL );
             free( path );
         }
+
+        open_mapped_exe_file( fd->unix_name, &fd->unix_fd );
 
         closed_fd->unix_fd = fd->unix_fd;
         closed_fd->unix_name = fd->unix_name;
