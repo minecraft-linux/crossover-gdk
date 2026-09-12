@@ -1771,16 +1771,21 @@ static NTSTATUS fd_set_file_info( int fd, UINT attr, BOOL force_set_xattr )
 }
 
 /***********************************************************************
- *           stat_mapped_exe_file
+ *           get_mapped_exe_file
  */
-static void stat_mapped_exe_file( const char* name, size_t name_len, struct stat *st )
+static int get_mapped_exe_file( const char* name, size_t name_len )
 {
-    if (name_len < 4 || strcasecmp( name + name_len - 4, ".exe" )) return;
-    const char *value = getenv( "WINE_EXE_FILE_MAP" );
-    if (!value || !*value) return;
-    const char* unix_name = realpath( name, NULL );
-    size_t unix_name_len = strlen( unix_name );
+    const char *value;
     const char *entry, *sep, *end;
+    size_t unix_name_len;
+    const char *unix_name;
+    int found_fd = -1;
+    if (name_len < 4 || strcasecmp( name + name_len - 4, ".exe" )) return found_fd;
+    value = getenv( "WINE_EXE_FILE_MAP" );
+    if (!value || !*value) return found_fd;
+    unix_name = realpath( name, NULL );
+    if (!unix_name) return found_fd;
+    unix_name_len = strlen( unix_name );
 
     for (entry = value; *entry; entry = *end ? end + 1 : end)
     {
@@ -1807,12 +1812,23 @@ static void stat_mapped_exe_file( const char* name, size_t name_len, struct stat
         if (fd < 0 || sep == entry || sep + 1 == end) continue;
         len = end - sep - 1;
         if (len != unix_name_len || strncmp( sep + 1, unix_name, len )) continue;
-
-        free( unix_name );
-        fstat( fd, st );
-        return;
+        found_fd = fd;
+        break;
     }
     free( unix_name );
+    return found_fd;
+}
+
+/***********************************************************************
+ *           stat_mapped_exe_file
+ */
+static void stat_mapped_exe_file( const char* name, size_t name_len, struct stat *st )
+{
+    int fd = get_mapped_exe_file( name, name_len );
+    if (fd != -1)
+    {
+        fstat( fd, st );
+    }
 }
 
 /* get the stat info and file attributes for a file (by name) */
@@ -4623,6 +4639,11 @@ NTSTATUS open_unix_file( HANDLE *handle, const char *unix_name, ACCESS_MASK acce
     struct object_attributes *objattr;
     unsigned int status;
     data_size_t len;
+    int unix_fd;
+    unix_fd = get_mapped_exe_file( unix_name, strlen( unix_name ) );
+    if (unix_fd != -1) {
+        return wine_server_fd_to_handle( dup( unix_fd ), access, attributes, handle );
+    }
 
     if ((status = alloc_object_attributes( attr, &objattr, &len ))) return status;
 
