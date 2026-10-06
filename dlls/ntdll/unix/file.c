@@ -4639,11 +4639,6 @@ NTSTATUS open_unix_file( HANDLE *handle, const char *unix_name, ACCESS_MASK acce
     struct object_attributes *objattr;
     unsigned int status;
     data_size_t len;
-    int unix_fd;
-    unix_fd = get_mapped_exe_file( unix_name, strlen( unix_name ) );
-    if (unix_fd != -1) {
-        return wine_server_fd_to_handle( dup( unix_fd ), access, attributes, handle );
-    }
 
     if ((status = alloc_object_attributes( attr, &objattr, &len ))) return status;
 
@@ -5207,9 +5202,6 @@ NTSTATUS WINAPI NtQueryInformationFile( HANDLE handle, IO_STATUS_BLOCK *io,
     }
     if (needs_close) close( fd );
     if (status == STATUS_SUCCESS && !io->Information) io->Information = info_sizes[class];
-    // if(status == STATUS_SUCCESS && io->Information) {
-
-    // }
     return io->Status = status;
 }
 
