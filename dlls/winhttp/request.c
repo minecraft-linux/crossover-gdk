@@ -3461,6 +3461,9 @@ static BOOL socket_set_option( struct object_header *hdr, DWORD option, void *bu
 
     switch (option)
     {
+    case WINHTTP_OPTION_WEB_SOCKET_CLOSE_TIMEOUT:
+        TRACE( "WINHTTP_OPTION_WEB_SOCKET_CLOSE_TIMEOUT\n");
+        return TRUE;
     case WINHTTP_OPTION_WEB_SOCKET_KEEPALIVE_INTERVAL:
     {
         DWORD interval;

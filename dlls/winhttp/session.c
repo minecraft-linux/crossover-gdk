@@ -1221,6 +1221,11 @@ static BOOL request_set_option( struct object_header *hdr, DWORD option, void *b
         TRACE( "Websocket send buffer size %lu.\n", buffer_size);
         return TRUE;
     }
+    case WINHTTP_OPTION_DECOMPRESSION:
+    {
+        TRACE( "WINHTTP_OPTION_DECOMPRESSION\n");
+        return TRUE;
+    }
 
     default:
         FIXME( "unimplemented option %lu\n", option );
